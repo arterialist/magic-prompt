@@ -15,6 +15,7 @@ from textual.widgets import Footer, Header, Input, Label, Static, TextArea
 
 from .config import (
     get_debounce_ms,
+    get_model,
     get_realtime_mode,
     get_saved_directory,
     save_directory,
@@ -343,12 +344,13 @@ class MainScreen(Screen):
                 f"{len(self.project_context.signatures)} signatures"
             )
 
-            # Initialize enricher
+            # Initialize Groq client with configured model
             try:
-                self.groq_client = GroqClient(api_key=self.api_key)
+                self.groq_client = GroqClient(api_key=self.api_key, model=get_model())
                 self.enricher = PromptEnricher(self.groq_client, self.project_context)
                 mode_str = "⚡ Real-time" if self.realtime_mode else "Enter to submit"
                 self.add_log(f"[bold green]✓ Ready![/] ({mode_str})")
+                self.add_log(f"[dim]Model: {self.groq_client.model}[/]")
             except ValueError as e:
                 self.add_log(f"[bold red]API Error:[/] {e}")
 

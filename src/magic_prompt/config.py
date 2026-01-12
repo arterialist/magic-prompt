@@ -9,6 +9,7 @@ from typing import Any
 # Default settings
 DEFAULT_DEBOUNCE_MS = 800
 DEFAULT_REALTIME_MODE = False
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 
 def get_config_dir() -> Path:
@@ -94,4 +95,17 @@ def set_realtime_mode(enabled: bool) -> None:
     """Set whether real-time mode is enabled by default."""
     config = load_config()
     config["realtime_mode"] = enabled
+    save_config(config)
+
+
+def get_model() -> str:
+    """Get the Groq model to use."""
+    config = load_config()
+    return config.get("model", DEFAULT_MODEL)
+
+
+def set_model(model: str) -> None:
+    """Set the Groq model to use."""
+    config = load_config()
+    config["model"] = model
     save_config(config)

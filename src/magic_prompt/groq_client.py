@@ -22,17 +22,19 @@ class GroqClient:
 
     DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         """
         Initialize the Groq client.
 
         Args:
             api_key: Optional API key. If not provided, uses GROQ_API_KEY env var.
+            model: Optional model name. Defaults to llama-3.3-70b-versatile.
         """
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY not provided and not found in environment")
 
+        self.model = model or self.DEFAULT_MODEL
         self._client = AsyncGroq(api_key=self.api_key)
         self._sync_client = Groq(api_key=self.api_key)
 
@@ -65,7 +67,7 @@ class GroqClient:
         Yields:
             Chunks of the completion as they arrive
         """
-        model = model or self.DEFAULT_MODEL
+        model = model or self.model
 
         def log(msg: str) -> None:
             if log_callback:
@@ -118,7 +120,7 @@ class GroqClient:
         """Test the API connection with a minimal request."""
         try:
             response = self._sync_client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
+                model=self.model,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=5,
             )

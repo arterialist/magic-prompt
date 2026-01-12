@@ -48,7 +48,9 @@ def get_prompt_from_input(args: argparse.Namespace) -> str | None:
     return None
 
 
-async def run_headless(prompt: str, directory: str, quiet: bool = False) -> str:
+async def run_headless(
+    prompt: str, directory: str, quiet: bool = False, model: str | None = None
+) -> str:
     """Run enrichment in headless mode and return result."""
     if not quiet:
         print(f"📁 Scanning: {directory}", file=sys.stderr)
@@ -75,11 +77,14 @@ async def run_headless(prompt: str, directory: str, quiet: bool = False) -> str:
         sys.exit(1)
 
     # Initialize enricher
-    client = GroqClient(api_key=api_key)
+    from .config import get_model
+
+    model = model or get_model()
+    client = GroqClient(api_key=api_key, model=model)
     enricher = PromptEnricher(client, context)
 
     if not quiet:
-        print("🔮 Enriching prompt...", file=sys.stderr)
+        print(f"🔮 Enriching prompt (model: {model})...", file=sys.stderr)
 
     # Stream enrichment
     result = ""
@@ -169,6 +174,12 @@ Examples:
         help="Generate a Raycast Script Command. If PATH is provided, saves to file.",
     )
 
+    parser.add_argument(
+        "--model",
+        metavar="MODEL",
+        help="Set the Groq model to use (e.g., llama-3.3-70b-versatile)",
+    )
+
     return parser
 
 
@@ -207,6 +218,15 @@ def run_cli() -> None:
 
         set_debounce_ms(args.debounce)
         print(f"✓ Debounce time set to: {args.debounce}ms")
+        if not args.tui and not args.prompt:
+            return  # Just setting config, exit
+
+    # Handle --model
+    if args.model:
+        from .config import set_model
+
+        set_model(args.model)
+        print(f"✓ Groq model set to: {args.model}")
         if not args.tui and not args.prompt:
             return  # Just setting config, exit
 
