@@ -200,7 +200,7 @@ class MainScreen(Screen):
     MainScreen {
         layout: grid;
         grid-size: 1 4;
-        grid-rows: 6 4 3fr 3;
+        grid-rows: 10 4 3fr 3;
     }
 
     #log-panel {
