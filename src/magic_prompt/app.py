@@ -189,7 +189,8 @@ class MainScreen(Screen):
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+t", "toggle_realtime", "Real-time"),
         Binding("ctrl+y", "copy_output", "Copy"),
-        Binding("ctrl+l", "clear_output", "Clear"),
+        Binding("ctrl+u", "clear_input", "Clear Input"),
+        Binding("ctrl+l", "clear_output", "Clear Output", show=False),
         Binding("ctrl+r", "rescan", "Rescan"),
     ]
 
@@ -454,6 +455,12 @@ class MainScreen(Screen):
     def action_clear_output(self) -> None:
         """Clear the output panel."""
         self.query_one("#output", TextArea).clear()
+
+    def action_clear_input(self) -> None:
+        """Clear the prompt input field."""
+        input_widget = self.query_one("#prompt-input", Input)
+        input_widget.value = ""
+        input_widget.focus()
 
     def action_copy_output(self) -> None:
         """Copy the enriched prompt to clipboard."""
