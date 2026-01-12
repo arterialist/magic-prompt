@@ -1,6 +1,6 @@
 [project]
 name = "ai-magic-prompt"
-version = "0.1.0"
+version = "0.1.1"
 description = "TUI app that enriches prompts using Groq API and project context"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
