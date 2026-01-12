@@ -11,15 +11,7 @@ from textual.binding import Binding
 from textual.containers import Container
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import (
-    Footer,
-    Header,
-    Input,
-    Label,
-    RichLog,
-    Static,
-    TextArea,
-)
+from textual.widgets import Footer, Header, Input, Label, Static, TextArea
 
 from .config import (
     get_debounce_ms,
