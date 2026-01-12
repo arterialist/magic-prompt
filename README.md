@@ -1,6 +1,6 @@
 # Magic Prompt
 
-[![PyPI version](https://badge.fury.io/py/magic-prompt.svg)](https://pypi.org/project/magic-prompt/)
+[![PyPI version](https://badge.fury.io/py/ai-magic-prompt.svg)](https://pypi.org/project/ai-magic-prompt/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
@@ -18,7 +18,7 @@ A TUI and CLI tool that enriches short, vague prompts into detailed, structured 
 ### From PyPI
 
 ```bash
-pip install magic-prompt
+pip install ai-magic-prompt
 ```
 
 Or with [uv](https://github.com/astral-sh/uv):

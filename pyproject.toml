@@ -1,5 +1,5 @@
 [project]
-name = "magic-prompt"
+name = "ai-magic-prompt"
 version = "0.1.0"
 description = "TUI app that enriches prompts using Groq API and project context"
 readme = "README.md"
