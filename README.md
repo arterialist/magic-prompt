@@ -102,7 +102,8 @@ magic-prompt
 | `Enter`  | Submit prompt     |
 | `Ctrl+T` | Toggle real-time  |
 | `Ctrl+Y` | Copy to clipboard |
-| `Ctrl+L` | Clear output      |
+| `Ctrl+U` | Clear Input       |
+| `Ctrl+L` | Clear Output      |
 | `Ctrl+R` | Rescan project    |
 | `Ctrl+Q` | Quit              |
 
@@ -115,4 +116,4 @@ magic-prompt
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.
