@@ -24,7 +24,7 @@ pip install ai-magic-prompt
 Or with [uv](https://github.com/astral-sh/uv):
 
 ```bash
-uv tool install magic-prompt
+uv tool install ai-magic-prompt
 ```
 
 ### From Source
