@@ -155,6 +155,20 @@ Examples:
         help="Set debounce time in milliseconds for TUI real-time mode (100-5000)",
     )
 
+    parser.add_argument(
+        "--raycast",
+        action="store_true",
+        help="Format output for Raycast (markdown, quiet)",
+    )
+
+    parser.add_argument(
+        "--install-raycast",
+        nargs="?",
+        const="",
+        metavar="PATH",
+        help="Generate a Raycast Script Command. If PATH is provided, saves to file.",
+    )
+
     return parser
 
 
@@ -196,6 +210,61 @@ def run_cli() -> None:
         if not args.tui and not args.prompt:
             return  # Just setting config, exit
 
+    # Handle --install-raycast
+    if args.install_raycast is not None:
+        import shutil
+        import stat
+
+        # Detect magic-prompt executable
+        executable = shutil.which("magic-prompt") or sys.argv[0]
+        if not executable.endswith("magic-prompt"):
+            # If running via python -m or similar, use the full python command
+            executable = f"{sys.executable} -m magic_prompt"
+
+        script_content = f"""#!/bin/bash
+
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title Magic Prompt
+# @raycast.mode fullOutput
+# @raycast.packageName Magic Prompt
+
+# Optional parameters:
+# @raycast.icon 🪄
+# @raycast.argument1 {{ "type": "text", "placeholder": "Prompt", "optional": false }}
+
+# Documentation:
+# @raycast.description Enrich prompts using project context.
+# @raycast.author arterialist
+
+if ! command -v {executable.split()[0]} &> /dev/null; then
+    echo "Error: {executable.split()[0]} not found in PATH."
+    exit 1
+fi
+
+{executable} --raycast "$1"
+"""
+        if args.install_raycast:
+            target_path = Path(os.path.expanduser(args.install_raycast))
+            if target_path.is_dir():
+                target_path = target_path / "magic-prompt.sh"
+
+            try:
+                target_path.write_text(script_content)
+                target_path.chmod(
+                    target_path.stat().st_mode
+                    | stat.S_IXUSR
+                    | stat.S_IXGRP
+                    | stat.S_IXOTH
+                )
+                print(f"✓ Raycast script installed to: {target_path}")
+            except Exception as e:
+                print(f"Error installing script: {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(script_content)
+        return
+
     # TUI mode
     if args.tui:
         from .app import main as tui_main
@@ -223,12 +292,14 @@ def run_cli() -> None:
     # Run headless enrichment
     load_dotenv()  # Ensure .env is loaded for API key
 
+    # Raycast mode implies quiet
+    is_quiet = args.quiet or args.raycast
+
     try:
-        if args.quiet:
-            result = asyncio.run(run_headless(prompt, directory, quiet=True))
+        result = asyncio.run(run_headless(prompt, directory, quiet=is_quiet))
+
+        if is_quiet:
             print(result)
-        else:
-            result = asyncio.run(run_headless(prompt, directory, quiet=False))
 
         # Always copy to clipboard in headless mode
         import subprocess

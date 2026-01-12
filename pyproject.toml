@@ -1,6 +1,6 @@
 [project]
 name = "ai-magic-prompt"
-version = "0.1.3"
+version = "0.1.4"
 description = "TUI app that enriches prompts using Groq API and project context"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -43,3 +43,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/magic_prompt"]
+
+[tool.raycast]
+name = "Magic Prompt"
+description = "Enrich prompts using Groq API and project context"
+icon = "magic-wand"
+author = "arterialist"
+version = "0.1.3"

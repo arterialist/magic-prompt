@@ -27,6 +27,20 @@ Or with [uv](https://github.com/astral-sh/uv):
 uv tool install ai-magic-prompt
 ```
 
+### Raycast Extension
+
+The easiest way to install the Raycast extension is using the built-in command:
+
+```bash
+# Print the script to your terminal
+magic-prompt --install-raycast
+
+# Or save it directly to your Raycast scripts folder
+magic-prompt --install-raycast ~/path/to/raycast/scripts
+```
+
+This will generate a script that automatically uses your current `magic-prompt` installation.
+
 ### From Source
 
 ```bash
