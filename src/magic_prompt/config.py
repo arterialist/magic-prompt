@@ -6,6 +6,11 @@ from pathlib import Path
 from typing import Any
 
 
+# Default settings
+DEFAULT_DEBOUNCE_MS = 800
+DEFAULT_REALTIME_MODE = False
+
+
 def get_config_dir() -> Path:
     """Get the configuration directory, creating it if needed."""
     # Use XDG config dir on Linux/macOS, or fall back to ~/.config
@@ -63,4 +68,30 @@ def clear_directory() -> None:
     """Clear the saved working directory."""
     config = load_config()
     config.pop("working_directory", None)
+    save_config(config)
+
+
+def get_debounce_ms() -> int:
+    """Get the debounce time in milliseconds."""
+    config = load_config()
+    return config.get("debounce_ms", DEFAULT_DEBOUNCE_MS)
+
+
+def set_debounce_ms(ms: int) -> None:
+    """Set the debounce time in milliseconds."""
+    config = load_config()
+    config["debounce_ms"] = max(100, min(5000, ms))  # Clamp between 100-5000ms
+    save_config(config)
+
+
+def get_realtime_mode() -> bool:
+    """Get whether real-time mode is enabled by default."""
+    config = load_config()
+    return config.get("realtime_mode", DEFAULT_REALTIME_MODE)
+
+
+def set_realtime_mode(enabled: bool) -> None:
+    """Set whether real-time mode is enabled by default."""
+    config = load_config()
+    config["realtime_mode"] = enabled
     save_config(config)

@@ -1,5 +1,6 @@
 """Textual TUI application for Magic Prompt."""
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
+from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import (
     Footer,
@@ -19,7 +21,13 @@ from textual.widgets import (
     TextArea,
 )
 
-from .config import get_saved_directory, save_directory
+from .config import (
+    get_debounce_ms,
+    get_realtime_mode,
+    get_saved_directory,
+    save_directory,
+    set_realtime_mode,
+)
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
 from .scanner import ProjectContext, scan_project
@@ -187,10 +195,14 @@ class MainScreen(Screen):
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
+        Binding("ctrl+t", "toggle_realtime", "Real-time"),
         Binding("ctrl+y", "copy_output", "Copy"),
         Binding("ctrl+l", "clear_output", "Clear"),
         Binding("ctrl+r", "rescan", "Rescan"),
     ]
+
+    # Reactive attribute for real-time mode
+    realtime_mode = reactive(False)
 
     CSS = """
     MainScreen {
@@ -258,7 +270,12 @@ class MainScreen(Screen):
         self.api_key = api_key
         self.project_context: ProjectContext | None = None
         self.enricher: PromptEnricher | None = None
+        self.groq_client: GroqClient | None = None
         self.is_enriching = False
+        self.realtime_mode = get_realtime_mode()
+        self._debounce_task: asyncio.Task | None = None
+        self._debounce_ms = get_debounce_ms()
+        self._last_input = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -288,7 +305,16 @@ class MainScreen(Screen):
 
     def on_mount(self) -> None:
         self.query_one("#prompt-input", Input).focus()
+        self._update_mode_indicator()
         self.scan_project()
+
+    def _update_mode_indicator(self) -> None:
+        """Update the input placeholder to show current mode."""
+        input_widget = self.query_one("#prompt-input", Input)
+        if self.realtime_mode:
+            input_widget.placeholder = f"⚡ Real-time mode (debounce: {self._debounce_ms}ms) - type to enrich..."
+        else:
+            input_widget.placeholder = "Type your prompt and press Enter..."
 
     def add_log(self, message: str) -> None:
         """Add message to the log panel."""
@@ -316,9 +342,10 @@ class MainScreen(Screen):
 
             # Initialize enricher
             try:
-                client = GroqClient(api_key=self.api_key)
-                self.enricher = PromptEnricher(client, self.project_context)
-                self.add_log("[bold green]✓ Ready![/] Type a prompt below.")
+                self.groq_client = GroqClient(api_key=self.api_key)
+                self.enricher = PromptEnricher(self.groq_client, self.project_context)
+                mode_str = "⚡ Real-time" if self.realtime_mode else "Enter to submit"
+                self.add_log(f"[bold green]✓ Ready![/] ({mode_str})")
             except ValueError as e:
                 self.add_log(f"[bold red]API Error:[/] {e}")
 
@@ -327,12 +354,47 @@ class MainScreen(Screen):
 
     @on(Input.Submitted, "#prompt-input")
     async def handle_prompt_submit(self, event: Input.Submitted) -> None:
+        """Handle Enter key - always enriches in non-real-time mode."""
         prompt = event.value.strip()
         if not prompt:
             return
 
+        # Cancel any pending debounce
+        if self._debounce_task:
+            self._debounce_task.cancel()
+            self._debounce_task = None
+
+        await self._do_enrich(prompt, clear_input=True)
+
+    @on(Input.Changed, "#prompt-input")
+    async def handle_input_changed(self, event: Input.Changed) -> None:
+        """Handle real-time input with debouncing."""
+        if not self.realtime_mode:
+            return
+
+        prompt = event.value.strip()
+        if not prompt or prompt == self._last_input:
+            return
+
+        # Cancel existing debounce task
+        if self._debounce_task:
+            self._debounce_task.cancel()
+
+        # Start new debounce timer
+        self._debounce_task = asyncio.create_task(self._debounced_enrich(prompt))
+
+    async def _debounced_enrich(self, prompt: str) -> None:
+        """Wait for debounce period then enrich."""
+        try:
+            await asyncio.sleep(self._debounce_ms / 1000.0)
+            if prompt and prompt != self._last_input:
+                await self._do_enrich(prompt, clear_input=False)
+        except asyncio.CancelledError:
+            pass  # Debounce was cancelled by new input
+
+    async def _do_enrich(self, prompt: str, clear_input: bool = True) -> None:
+        """Perform the actual enrichment."""
         if self.is_enriching:
-            self.add_log("[yellow]Already enriching, please wait...[/]")
             return
 
         if not self.enricher:
@@ -341,9 +403,11 @@ class MainScreen(Screen):
             )
             return
 
-        # Clear input and output
-        input_widget = self.query_one("#prompt-input", Input)
-        input_widget.value = ""
+        self._last_input = prompt
+
+        if clear_input:
+            input_widget = self.query_one("#prompt-input", Input)
+            input_widget.value = ""
 
         # Show original prompt
         original_widget = self.query_one("#original-prompt", Static)
@@ -372,6 +436,13 @@ class MainScreen(Screen):
                 output.text = full_response
 
             self.add_log("[bold green]✓ Enrichment complete[/]")
+
+            # Show token usage if available
+            if self.groq_client and self.groq_client.last_usage:
+                usage = self.groq_client.last_usage
+                self.add_log(
+                    f"[dim]Tokens: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})[/dim]"
+                )
 
         except Exception as e:
             self.add_log(f"[bold red]Error:[/] {e}")
@@ -406,6 +477,18 @@ class MainScreen(Screen):
     def action_rescan(self) -> None:
         """Rescan the project directory."""
         self.scan_project()
+
+    def action_toggle_realtime(self) -> None:
+        """Toggle real-time enrichment mode."""
+        self.realtime_mode = not self.realtime_mode
+        set_realtime_mode(self.realtime_mode)
+        self._update_mode_indicator()
+
+        mode_str = "⚡ Real-time" if self.realtime_mode else "Manual (Enter)"
+        self.add_log(f"[bold cyan]Mode:[/] {mode_str}")
+
+        if self.realtime_mode:
+            self.add_log(f"[dim]Debounce: {self._debounce_ms}ms[/dim]")
 
 
 class MagicPromptApp(App):

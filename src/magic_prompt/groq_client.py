@@ -2,9 +2,19 @@
 
 import os
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from typing import Callable
 
 from groq import AsyncGroq, Groq
+
+
+@dataclass
+class TokenUsage:
+    """Token usage statistics from API call."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
 class GroqClient:
@@ -25,6 +35,12 @@ class GroqClient:
 
         self._client = AsyncGroq(api_key=self.api_key)
         self._sync_client = Groq(api_key=self.api_key)
+
+        # Token usage tracking
+        self.last_usage: TokenUsage | None = None
+        self.total_prompt_tokens: int = 0
+        self.total_completion_tokens: int = 0
+        self.total_requests: int = 0
 
     async def stream_completion(
         self,
@@ -67,17 +83,37 @@ class GroqClient:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 stream=True,
+                stream_options={"include_usage": True},
             )
 
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
+                # Capture usage from final chunk
+                if chunk.usage:
+                    self.last_usage = TokenUsage(
+                        prompt_tokens=chunk.usage.prompt_tokens,
+                        completion_tokens=chunk.usage.completion_tokens,
+                        total_tokens=chunk.usage.total_tokens,
+                    )
+                    self.total_prompt_tokens += chunk.usage.prompt_tokens
+                    self.total_completion_tokens += chunk.usage.completion_tokens
+                    self.total_requests += 1
+                    log(
+                        f"Tokens: {chunk.usage.total_tokens} (prompt: {chunk.usage.prompt_tokens}, completion: {chunk.usage.completion_tokens})"
+                    )
+
             log("Completion finished")
 
         except Exception as e:
             log(f"Error: {e}")
             raise
+
+    def get_session_stats(self) -> str:
+        """Get formatted session statistics."""
+        total = self.total_prompt_tokens + self.total_completion_tokens
+        return f"Session: {self.total_requests} requests, {total} tokens"
 
     def test_connection(self) -> bool:
         """Test the API connection with a minimal request."""

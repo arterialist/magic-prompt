@@ -148,6 +148,13 @@ Examples:
         help="Suppress progress output, only print result (no clipboard)",
     )
 
+    parser.add_argument(
+        "--debounce",
+        type=int,
+        metavar="MS",
+        help="Set debounce time in milliseconds for TUI real-time mode (100-5000)",
+    )
+
     return parser
 
 
@@ -179,6 +186,15 @@ def run_cli() -> None:
         save_directory(directory)
         print(f"✓ Saved default directory: {directory}")
         return
+
+    # Handle --debounce
+    if args.debounce is not None:
+        from .config import set_debounce_ms
+
+        set_debounce_ms(args.debounce)
+        print(f"✓ Debounce time set to: {args.debounce}ms")
+        if not args.tui and not args.prompt:
+            return  # Just setting config, exit
 
     # TUI mode
     if args.tui:
