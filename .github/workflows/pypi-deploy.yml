@@ -3,6 +3,11 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
   workflow_dispatch:
 
 jobs:
@@ -48,3 +53,5 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
