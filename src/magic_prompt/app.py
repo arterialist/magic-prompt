@@ -281,7 +281,7 @@ class MainScreen(Screen):
         yield Header()
         yield Container(
             Label("📋 Logs", classes="panel-label"),
-            RichLog(highlight=True, markup=True, wrap=True, id="log"),
+            TextArea(read_only=True, id="log", show_line_numbers=False),
             id="log-panel",
         )
         yield Container(
@@ -318,8 +318,18 @@ class MainScreen(Screen):
 
     def add_log(self, message: str) -> None:
         """Add message to the log panel."""
-        log_widget = self.query_one("#log", RichLog)
-        log_widget.write(message)
+        import re
+
+        # Strip rich markup for plain text display
+        plain_message = re.sub(r"\[/?[^\]]+\]", "", message)
+        log_widget = self.query_one("#log", TextArea)
+        current = log_widget.text
+        if current:
+            log_widget.text = current + "\n" + plain_message
+        else:
+            log_widget.text = plain_message
+        # Scroll to bottom
+        log_widget.scroll_end(animate=False)
 
     @work(thread=True)
     def scan_project(self) -> None:
