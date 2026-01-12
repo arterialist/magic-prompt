@@ -59,6 +59,40 @@ Set it as an environment variable:
 export GROQ_API_KEY=gsk_...
 ```
 
+## Configuration
+
+Magic Prompt saves your preferences in `~/.config/magic-prompt/config.json`. You can configure these via the CLI:
+
+### Model Selection
+
+Set your preferred Groq model (default: `llama-3.3-70b-versatile`):
+
+```bash
+magic-prompt --model llama-3.1-8b-instant
+```
+
+### Debounce Time
+
+Adjust the real-time enrichment delay in milliseconds (default: `800`):
+
+```bash
+magic-prompt --debounce 500
+```
+
+### Default Directory
+
+Save your current project directory as the default:
+
+```bash
+magic-prompt --save-dir .
+```
+
+### View Current Config
+
+```bash
+magic-prompt --show-config
+```
+
 Or create a `.env` file in your project directory:
 
 ```bash
