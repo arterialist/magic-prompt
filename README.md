@@ -1,5 +1,9 @@
 # Magic Prompt
 
+[![PyPI version](https://badge.fury.io/py/magic-prompt.svg)](https://pypi.org/project/magic-prompt/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 A TUI and CLI tool that enriches short, vague prompts into detailed, structured prompts using Groq API and your project's actual file structure and codebase.
 
 ## Features
@@ -11,20 +15,40 @@ A TUI and CLI tool that enriches short, vague prompts into detailed, structured 
 
 ## Installation
 
-Requires Python 3.11+ and [uv](https://github.com/astral-sh/uv):
+### From PyPI
 
 ```bash
+pip install magic-prompt
+```
+
+Or with [uv](https://github.com/astral-sh/uv):
+
+```bash
+uv tool install magic-prompt
+```
+
+### From Source
+
+```bash
+git clone https://github.com/arterialist/magic-prompt.git
 cd magic-prompt
-uv sync
+pip install -e .
 ```
 
 ## Setup
 
 Get your Groq API key from [console.groq.com/keys](https://console.groq.com/keys).
 
+Set it as an environment variable:
+
 ```bash
-cp .env.example .env
-# Edit .env with your GROQ_API_KEY
+export GROQ_API_KEY=gsk_...
+```
+
+Or create a `.env` file in your project directory:
+
+```bash
+GROQ_API_KEY=your_api_key_here
 ```
 
 ## Usage
@@ -45,26 +69,18 @@ magic-prompt -d /path/to/project "refactor the API"
 
 # Quiet mode - only output result (good for piping)
 magic-prompt -q "add tests" > enriched.md
-
-# Copy result to clipboard
-magic-prompt -c "improve error handling"
 ```
 
 #### CLI Options
 
-| Option            | Description                                   |
-| ----------------- | --------------------------------------------- |
-| `-d, --directory` | Project directory (default: from .env or cwd) |
-| `-t, --tui`       | Launch interactive TUI mode                   |
-| `-q, --quiet`     | Only output result, no progress               |
-| `-c, --copy`      | Copy result to clipboard (macOS)              |
-
-#### Environment Variables
-
-Set in `.env` file:
-
-- `GROQ_API_KEY` - Required API key
-- `MAGIC_PROMPT_DIR` - Default project directory for headless mode
+| Option            | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| `-d, --directory` | Project directory (default: from config or cwd) |
+| `-t, --tui`       | Launch interactive TUI mode                     |
+| `-q, --quiet`     | Only output result, no progress                 |
+| `--debounce MS`   | Set debounce time for real-time mode            |
+| `--save-dir DIR`  | Save default directory for future runs          |
+| `--show-config`   | Show current configuration                      |
 
 ### Interactive TUI Mode
 
@@ -84,10 +100,11 @@ magic-prompt
 | Key      | Action            |
 | -------- | ----------------- |
 | `Enter`  | Submit prompt     |
+| `Ctrl+T` | Toggle real-time  |
 | `Ctrl+Y` | Copy to clipboard |
 | `Ctrl+L` | Clear output      |
 | `Ctrl+R` | Rescan project    |
-| `q`      | Quit              |
+| `Ctrl+Q` | Quit              |
 
 ## How It Works
 
@@ -95,3 +112,7 @@ magic-prompt
 2. **Extracts** docstrings, function signatures, and imports
 3. **Sends** context + your prompt to Groq's LLM
 4. **Streams** an enriched version that references actual files and APIs
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
