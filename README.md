@@ -12,6 +12,9 @@ A TUI and CLI tool that enriches short, vague prompts into detailed, structured 
 - 🧠 **AI-Powered**: Uses Groq's fast LLM API to intelligently expand prompts
 - ⚡ **Real-Time Streaming**: Watch the enriched prompt generate in real-time
 - 🖥️ **Dual Mode**: Interactive TUI or headless CLI for shell scripting
+- 🗂️ **Workspace Management**: Save and switch between multiple project workspaces
+- 🎯 **Dynamic Model Selection**: Automatically fetch and select from available Groq models
+- 📊 **Status Bar**: Real-time display of current mode, model, and settings
 
 ## Installation
 
@@ -145,15 +148,19 @@ magic-prompt
 
 #### TUI Keyboard Shortcuts
 
-| Key      | Action            |
-| -------- | ----------------- |
-| `Enter`  | Submit prompt     |
-| `Ctrl+T` | Toggle real-time  |
-| `Ctrl+Y` | Copy to clipboard |
-| `Ctrl+U` | Clear Input       |
-| `Ctrl+L` | Clear Output      |
-| `Ctrl+R` | Rescan project    |
-| `Ctrl+Q` | Quit              |
+| Key      | Action                   |
+| -------- | ------------------------ |
+| `Enter`  | Submit prompt            |
+| `Ctrl+T` | Toggle real-time         |
+| `Ctrl+Y` | Copy to clipboard        |
+| `Ctrl+U` | Clear Input              |
+| `Ctrl+L` | Clear Output             |
+| `Ctrl+R` | Rescan project           |
+| `Ctrl+S` | Open Settings            |
+| `Ctrl+M` | Cycle enrichment mode    |
+| `Ctrl+W` | Manage workspaces        |
+| `Ctrl+D` | Cycle through workspaces |
+| `Ctrl+Q` | Quit                     |
 
 ## How It Works
 
