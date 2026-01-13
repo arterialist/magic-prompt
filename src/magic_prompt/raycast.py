@@ -40,8 +40,8 @@ async def main():
     # Load environment variables
     load_dotenv()
 
-    # Get directory
-    directory = directory_arg or get_working_directory()
+    # Get directory (handles labels or paths)
+    directory = get_working_directory(directory_arg)
 
     if not Path(directory).is_dir():
         print(f"Error: Directory not found: {directory}")
