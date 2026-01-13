@@ -22,6 +22,7 @@ from .config import (
     set_realtime_mode,
     get_api_key,
     get_enrichment_mode,
+    set_enrichment_mode,
 )
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
@@ -197,6 +198,7 @@ class MainScreen(Screen):
         Binding("ctrl+l", "clear_output", "Clear Output", show=False),
         Binding("ctrl+r", "rescan", "Rescan"),
         Binding("ctrl+s", "settings", "Settings"),
+        Binding("ctrl+m", "cycle_mode", "Cycle Mode"),
     ]
 
     # Reactive attribute for real-time mode
@@ -205,8 +207,8 @@ class MainScreen(Screen):
     CSS = """
     MainScreen {
         layout: grid;
-        grid-size: 1 4;
-        grid-rows: 10 4 3fr 3;
+        grid-size: 1 5;
+        grid-rows: 10 4 3fr 3 2;
     }
 
     #log-panel {
@@ -254,6 +256,16 @@ class MainScreen(Screen):
         background: $surface;
         color: $text-muted;
     }
+
+    #settings-bar {
+        background: black;
+        color: $text;
+        padding: 0 1;
+        text-align: center;
+        text-style: italic;
+        height: 1;
+        content-align: center middle;
+    }
     """
 
     def __init__(
@@ -299,11 +311,14 @@ class MainScreen(Screen):
             ),
             id="input-container",
         )
+        yield Static("Loading settings...", id="settings-bar")
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#prompt-input", Input).focus()
         self._update_mode_indicator()
+        self._update_settings_bar()
+        self.app.sub_title = f"Working Directory: {self.project_path}"
         self.scan_project()
 
     def _update_mode_indicator(self) -> None:
@@ -500,12 +515,28 @@ class MainScreen(Screen):
         self.realtime_mode = not self.realtime_mode
         set_realtime_mode(self.realtime_mode)
         self._update_mode_indicator()
+        self._update_settings_bar()
 
         mode_str = "⚡ Real-time" if self.realtime_mode else "Manual (Enter)"
         self.add_log(f"[bold cyan]Mode:[/] {mode_str}")
 
         if self.realtime_mode:
             self.add_log(f"[dim]Debounce: {self._debounce_ms}ms[/dim]")
+
+    def _update_settings_bar(self) -> None:
+        """Update the settings status bar at the bottom."""
+        mode = get_enrichment_mode().capitalize()
+        realtime = "On" if self.realtime_mode else "Off"
+        model = get_model()
+        provider = "Groq"
+
+        settings_text = (
+            f"Mode: [bold cyan]{mode}[/] | "
+            f"Real-time: [bold yellow]{realtime}[/] | "
+            f"Model: [bold green]{model}[/] | "
+            f"Provider: [bold magenta]{provider}[/]"
+        )
+        self.query_one("#settings-bar", Static).update(settings_text)
 
     def action_settings(self) -> None:
         """Open the settings screen."""
@@ -519,6 +550,7 @@ class MainScreen(Screen):
             self._debounce_ms = get_debounce_ms()
             self.realtime_mode = get_realtime_mode()
             self._update_mode_indicator()
+            self._update_settings_bar()
 
             # Re-initialize groq client if needed (api key or model might have changed)
             try:
@@ -532,6 +564,27 @@ class MainScreen(Screen):
                 self.add_log(f"[dim]Mode: {self.enricher.mode}[/]")
             except Exception as e:
                 self.add_log(f"[bold red]Error updating client:[/] {e}")
+
+    def action_cycle_mode(self) -> None:
+        """Cycle between enrichment modes."""
+        modes = ["standard", "pseudocode"]
+        current = get_enrichment_mode()
+        try:
+            next_index = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_index = 0
+
+        next_mode = modes[next_index]
+        set_enrichment_mode(next_mode)
+
+        # Update enricher
+        if self.enricher:
+            self.enricher = PromptEnricher(
+                self.groq_client, self.project_context, mode=next_mode
+            )
+
+        self.add_log(f"[bold cyan]Mode cycled to:[/] {next_mode.capitalize()}")
+        self._update_settings_bar()
 
 
 class MagicPromptApp(App):
