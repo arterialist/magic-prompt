@@ -3,15 +3,15 @@
 import asyncio
 import os
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from textual import on, work
 from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.containers import Container
 from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, Label, Static, TextArea
+from textual.containers import Container
 
 from .config import (
     get_debounce_ms,
@@ -23,11 +23,19 @@ from .config import (
     get_api_key,
     get_enrichment_mode,
     set_enrichment_mode,
+    get_copy_toast,
+    get_next_directory,
+    get_workspace,
+    set_model,
+    get_max_files,
+    get_max_depth,
 )
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
 from .scanner import ProjectContext, scan_project
 from .settings import SettingsScreen
+from .workspace_screen import WorkspaceScreen
+from .keyboard import DEFAULT_BINDINGS
 
 
 class DirectoryScreen(Screen):
@@ -187,19 +195,31 @@ class APIKeyScreen(Screen):
         self.app.set_api_key(key)
 
 
+class StatusBar(Static):
+    """Status bar widget displaying current mode, realtime status, model, and provider."""
+
+    def update_display(self) -> None:
+        """Update the status bar display with current values."""
+        mode = get_enrichment_mode()
+        realtime = get_realtime_mode()
+        model = get_model()
+
+        realtime_str = "On" if realtime else "Off"
+
+        status_text = (
+            f"[bold cyan]Mode:[/] {mode.capitalize()}  |  "
+            f"[bold yellow]Real-time:[/] {realtime_str}  |  "
+            f"[bold green]Model:[/] {model}  |  "
+            f"[bold magenta]Provider:[/] Groq"
+        )
+
+        self.update(status_text)
+
+
 class MainScreen(Screen):
     """Main enrichment screen with log, output, and input panels."""
 
-    BINDINGS = [
-        Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+t", "toggle_realtime", "Real-time"),
-        Binding("ctrl+y", "copy_output", "Copy"),
-        Binding("ctrl+u", "clear_input", "Clear Input"),
-        Binding("ctrl+l", "clear_output", "Clear Output", show=False),
-        Binding("ctrl+r", "rescan", "Rescan"),
-        Binding("ctrl+s", "settings", "Settings"),
-        Binding("ctrl+m", "cycle_mode", "Cycle Mode"),
-    ]
+    BINDINGS = DEFAULT_BINDINGS
 
     # Reactive attribute for real-time mode
     realtime_mode = reactive(False)
@@ -257,14 +277,13 @@ class MainScreen(Screen):
         color: $text-muted;
     }
 
+
     #settings-bar {
-        background: black;
+        background: $surface;
         color: $text;
-        padding: 0 1;
-        text-align: center;
-        text-style: italic;
-        height: 1;
-        content-align: center middle;
+        height: 100%;
+        padding: 0 2;
+        border-top: solid $primary;
     }
     """
 
@@ -311,7 +330,8 @@ class MainScreen(Screen):
             ),
             id="input-container",
         )
-        yield Static("Loading settings...", id="settings-bar")
+
+        yield StatusBar(id="settings-bar")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -352,6 +372,8 @@ class MainScreen(Screen):
         try:
             self.project_context = scan_project(
                 self.project_path,
+                max_files=get_max_files(),
+                max_depth=get_max_depth(),
                 log_callback=lambda msg: self.app.call_from_thread(
                     self.add_log, f"[dim]{msg}[/dim]"
                 ),
@@ -503,6 +525,10 @@ class MainScreen(Screen):
             )
             process.communicate(input=text)
             self.add_log("[bold green]✓ Copied to clipboard![/]")
+            if get_copy_toast():
+                self.app.notify(
+                    "✓ Copied to clipboard!", severity="information", timeout=3
+                )
         except Exception as e:
             self.add_log(f"[red]Copy failed: {e}[/]")
 
@@ -525,26 +551,19 @@ class MainScreen(Screen):
 
     def _update_settings_bar(self) -> None:
         """Update the settings status bar at the bottom."""
-        mode = get_enrichment_mode().capitalize()
-        realtime = "On" if self.realtime_mode else "Off"
-        model = get_model()
-        provider = "Groq"
-
-        settings_text = (
-            f"Mode: [bold cyan]{mode}[/] | "
-            f"Real-time: [bold yellow]{realtime}[/] | "
-            f"Model: [bold green]{model}[/] | "
-            f"Provider: [bold magenta]{provider}[/]"
-        )
-        self.query_one("#settings-bar", Static).update(settings_text)
+        self.query_one(StatusBar).update_display()
 
     def action_settings(self) -> None:
         """Open the settings screen."""
         self.app.push_screen(SettingsScreen(), callback=self.handle_settings_callback)
 
-    def handle_settings_callback(self, changed: bool) -> None:
+    def handle_settings_callback(self, result: Any) -> None:
         """Handle settings screen being dismissed."""
-        if changed:
+        if result == "workspaces":
+            self.action_workspace()
+            return
+
+        if result is True:
             self.add_log("[bold green]✓ Settings updated[/]")
             # Update local state from config
             self._debounce_ms = get_debounce_ms()
@@ -585,6 +604,73 @@ class MainScreen(Screen):
 
         self.add_log(f"[bold cyan]Mode cycled to:[/] {next_mode.capitalize()}")
         self._update_settings_bar()
+
+    def action_cycle_directory(self) -> None:
+        """Cycle between saved project directories."""
+        result = get_next_directory(self.project_path)
+        if not result:
+            self.add_log("[yellow]No other directories saved[/]")
+            return
+
+        label, next_path = result
+        if next_path == self.project_path:
+            self.add_log("[yellow]Only one directory saved[/]")
+            return
+
+        self.project_path = next_path
+        # Save as last used
+        save_directory(next_path, label=label)
+
+        self.add_log(f"[bold cyan]Switched to directory:[/] {label} ({next_path})")
+        self.app.sub_title = f"Working Directory: {self.project_path}"
+        self._update_settings_bar()
+        self.scan_project()
+
+    def action_workspace(self) -> None:
+        """Open the workspace management screen."""
+        self.app.push_screen(
+            WorkspaceScreen(current_path=self.project_path),
+            callback=self.handle_workspace_callback,
+        )
+
+    def handle_workspace_callback(self, workspace_name: str | None) -> None:
+        """Handle workspace activation from the workspace screen."""
+        if not workspace_name:
+            return
+
+        ws_data = get_workspace(workspace_name)
+        if not ws_data:
+            return
+
+        path = ws_data.get("path")
+        if not path or not Path(path).is_dir():
+            self.add_log(f"[bold red]Error:[/] Workspace path not found: {path}")
+            return
+
+        # Activate workspace
+        self.project_path = path
+
+        # Apply workspace-specific settings if they exist
+        if "model" in ws_data:
+            set_model(ws_data["model"])
+        if "mode" in ws_data:
+            set_enrichment_mode(ws_data["mode"])
+        if "realtime" in ws_data:
+            set_realtime_mode(ws_data["realtime"])
+
+        self.add_log(f"[bold cyan]Activated workspace:[/] {workspace_name}")
+        self.app.sub_title = f"Working Directory: {self.project_path}"
+
+        # Re-initialize everything
+        try:
+            self.groq_client = GroqClient()
+            self.realtime_mode = get_realtime_mode()
+            self._debounce_ms = get_debounce_ms()
+            self._update_mode_indicator()
+            self._update_settings_bar()
+            self.scan_project()
+        except Exception as e:
+            self.add_log(f"[bold red]Activation Error:[/] {e}")
 
 
 class MagicPromptApp(App):

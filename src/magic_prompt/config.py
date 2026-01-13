@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 
 # Default settings
@@ -11,6 +11,17 @@ DEFAULT_DEBOUNCE_MS = 800
 DEFAULT_REALTIME_MODE = False
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_ENRICHMENT_MODE = "standard"
+DEFAULT_COPY_TOAST = True
+DEFAULT_MAX_FILES = 1000
+DEFAULT_MAX_DEPTH = 10
+DEFAULT_AVAILABLE_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "llama3-70b-8192",
+    "llama3-8b-8192",
+    "gemma2-9b-it",
+    "mixtral-8x7b-32768",
+]
 
 
 def get_config_dir() -> Path:
@@ -59,8 +70,15 @@ def get_saved_directory() -> str | None:
     return None
 
 
-def save_directory(directory: str) -> None:
-    """Save the working directory to config."""
+def save_directory(directory: str, label: str | None = None) -> None:
+    """Save the working directory (wrapper for save_workspace)."""
+    # If no label provided, use the directory name
+    if not label:
+        label = Path(directory).name or "default"
+
+    save_workspace(label, {"path": str(Path(directory).resolve())})
+
+    # Also update last used
     config = load_config()
     config["working_directory"] = str(Path(directory).resolve())
     save_config(config)
@@ -97,6 +115,86 @@ def set_realtime_mode(enabled: bool) -> None:
     config = load_config()
     config["realtime_mode"] = enabled
     save_config(config)
+
+
+# --- Workspace Management ---
+
+
+def list_workspaces() -> Dict[str, Dict[str, Any]]:
+    """List all saved workspaces, performing migration if needed."""
+    config = load_config()
+    workspaces = config.get("workspaces", {})
+
+    # Migration: Convert saved_directories to workspaces
+    saved_dirs = config.get("saved_directories", {})
+    if saved_dirs and not workspaces:
+        for label, path in saved_dirs.items():
+            workspaces[label] = {"path": path}
+        config["workspaces"] = workspaces
+        # Clear old key after migration
+        config.pop("saved_directories", None)
+        save_config(config)
+
+    return workspaces
+
+
+def get_workspace(name: str) -> Dict[str, Any] | None:
+    """Get a specific workspace configuration."""
+    return list_workspaces().get(name)
+
+
+def save_workspace(name: str, workspace_data: Dict[str, Any]) -> None:
+    """Save or update a workspace configuration."""
+    config = load_config()
+    workspaces = config.get("workspaces", {})
+
+    # Handle if data is a Workspace object (converted elsewhere or here)
+    if hasattr(workspace_data, "to_dict"):
+        data = workspace_data.to_dict()
+    else:
+        data = workspace_data
+
+    workspaces[name] = data
+    config["workspaces"] = workspaces
+    save_config(config)
+
+
+def delete_workspace(name: str) -> None:
+    """Delete a workspace configuration."""
+    config = load_config()
+    workspaces = config.get("workspaces", {})
+    if name in workspaces:
+        del workspaces[name]
+        config["workspaces"] = workspaces
+        save_config(config)
+
+
+def get_directory_by_label(label: str) -> str | None:
+    """Get a saved directory path by its label (now workspace name)."""
+    ws = get_workspace(label)
+    if ws:
+        path = ws.get("path")
+        if path and Path(path).is_dir():
+            return path
+    return None
+
+
+def get_next_directory(current_path: str) -> tuple[str, str] | None:
+    """Get the next saved workspace (name, path) for cycling."""
+    workspaces = list_workspaces()
+    if not workspaces:
+        return None
+
+    names = list(workspaces.keys())
+    paths = [ws.get("path") for ws in workspaces.values()]
+
+    try:
+        current_index = paths.index(str(Path(current_path).resolve()))
+    except ValueError:
+        return names[0], paths[0]
+
+    next_index = (current_index + 1) % len(names)
+    return names[next_index], paths[next_index]
 
 
 def get_model() -> str:
@@ -136,3 +234,70 @@ def set_enrichment_mode(mode: str) -> None:
     config = load_config()
     config["enrichment_mode"] = mode
     save_config(config)
+
+
+def get_copy_toast() -> bool:
+    """Get whether copy toast notifications are enabled."""
+    config = load_config()
+    return config.get("copy_toast", DEFAULT_COPY_TOAST)
+
+
+def set_copy_toast(enabled: bool) -> None:
+    """Set whether copy toast notifications are enabled."""
+    config = load_config()
+    config["copy_toast"] = enabled
+    save_config(config)
+
+
+def get_max_files() -> int:
+    """Get the maximum number of files to scan."""
+    config = load_config()
+    return config.get("max_files", DEFAULT_MAX_FILES)
+
+
+def set_max_files(limit: int) -> None:
+    """Set the maximum number of files to scan."""
+    config = load_config()
+    config["max_files"] = max(100, min(10000, limit))
+    save_config(config)
+
+
+def get_max_depth() -> int:
+    """Get the maximum directory depth to scan."""
+    config = load_config()
+    return config.get("max_depth", DEFAULT_MAX_DEPTH)
+
+
+def set_max_depth(depth: int) -> None:
+    """Set the maximum directory depth to scan."""
+    config = load_config()
+    config["max_depth"] = max(1, min(20, depth))
+    save_config(config)
+
+
+def get_available_models_from_config() -> list[str]:
+    """Get the list of available models from config."""
+    config = load_config()
+    return config.get("available_models", DEFAULT_AVAILABLE_MODELS)
+
+
+def update_available_models() -> list[str]:
+    """Fetch and update available models from Groq API."""
+    from .groq_client import GroqClient
+
+    api_key = get_api_key()
+    if not api_key:
+        return get_available_models_from_config()
+
+    try:
+        client = GroqClient(api_key=api_key)
+        models = client.get_available_models()
+        if models:
+            config = load_config()
+            config["available_models"] = models
+            save_config(config)
+            return models
+    except Exception:
+        pass
+
+    return get_available_models_from_config()

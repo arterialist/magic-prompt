@@ -8,18 +8,35 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .config import get_saved_directory, save_directory
+from .config import (
+    get_saved_directory,
+    save_directory,
+    get_directory_by_label,
+    get_workspace,
+    set_model,
+    set_enrichment_mode,
+)
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
 from .scanner import scan_project
 
 
-def get_working_directory() -> str:
-    """Get working directory from config, .env, or current directory."""
+def get_working_directory(label_or_path: str | None = None) -> str:
+    """Get working directory from label, path, config, .env, or current directory."""
+    if label_or_path:
+        # Check if it's a saved label
+        path = get_directory_by_label(label_or_path)
+        if path:
+            return path
+        # Otherwise treat as path
+        expanded = os.path.expanduser(label_or_path)
+        if Path(expanded).is_dir():
+            return expanded
+
     # Load .env from current directory
     load_dotenv()
 
-    # Check for saved config first
+    # Check for saved config (last used)
     saved_dir = get_saved_directory()
     if saved_dir:
         return saved_dir
@@ -130,13 +147,24 @@ Examples:
     parser.add_argument(
         "--save-dir",
         metavar="DIR",
-        help="Save a directory as the default for future runs",
+        help="Save a directory for future use (combine with --label)",
+    )
+
+    parser.add_argument(
+        "--label",
+        help="Label for the directory being saved or used",
     )
 
     parser.add_argument(
         "--show-config",
         action="store_true",
         help="Show current saved configuration",
+    )
+
+    parser.add_argument(
+        "-w",
+        "--workspace",
+        help="Use a saved workspace configuration",
     )
 
     parser.add_argument(
@@ -208,8 +236,9 @@ def run_cli() -> None:
         if not Path(directory).is_dir():
             print(f"Error: Directory not found: {directory}", file=sys.stderr)
             sys.exit(1)
-        save_directory(directory)
-        print(f"✓ Saved default directory: {directory}")
+        save_directory(directory, label=args.label)
+        label_str = f" with label '{args.label}'" if args.label else ""
+        print(f"✓ Saved directory: {directory}{label_str}")
         return
 
     # Handle --debounce
@@ -302,8 +331,34 @@ fi
         tui_main()
         return
 
-    # Get directory (from arg, config, env, or cwd)
-    directory = args.directory or get_working_directory()
+    # Load workspace if provided
+    workspace_config = {}
+    if args.workspace:
+        workspace_config = get_workspace(args.workspace)
+        if not workspace_config:
+            print(f"Error: Workspace not found: {args.workspace}", file=sys.stderr)
+            sys.exit(1)
+
+        # Apply workspace settings to args if not overridden
+        if "model" in workspace_config and not args.model:
+            args.model = workspace_config["model"]
+        if "mode" in workspace_config:
+            set_enrichment_mode(workspace_config["mode"])
+
+    # Get directory (from label, arg, workspace, config, env, or cwd)
+    directory = (
+        args.directory
+        or args.label
+        or (workspace_config.get("path") if workspace_config else None)
+        or get_working_directory()
+    )
+
+    # If directory is just a label, resolve it
+    from .config import get_directory_by_label
+
+    resolved_path = get_directory_by_label(directory)
+    if resolved_path:
+        directory = resolved_path
 
     if not Path(directory).is_dir():
         print(f"Error: Directory not found: {directory}", file=sys.stderr)
