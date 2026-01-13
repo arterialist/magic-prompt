@@ -5,9 +5,13 @@ from typing import Callable
 
 from .groq_client import GroqClient
 from .scanner import ProjectContext
+from .modes.pseudocode import (
+    PSEUDOCODE_SYSTEM_PROMPT_TEMPLATE,
+    PSEUDOCODE_USER_TEMPLATE,
+)
 
 
-SYSTEM_PROMPT_TEMPLATE = """You are a precise, technical prompt engineer. Your job is to transform short user prompts into detailed, accurate prompts that reference the ACTUAL codebase structure provided below.
+STANDARD_SYSTEM_PROMPT_TEMPLATE = """You are a precise, technical prompt engineer. Your job is to transform short user prompts into detailed, accurate prompts that reference the ACTUAL codebase structure provided below.
 
 {project_context}
 
@@ -38,23 +42,48 @@ Transform the user's vague prompt into a precise, actionable request. Follow the
 
 Output ONLY the enriched prompt."""
 
+STANDARD_USER_TEMPLATE = """Transform this prompt into a detailed, accurate request:
+
+"{user_prompt}"
+
+Requirements:
+- Reference ONLY files and functions that appear in the project context
+- If you need to suggest creating new files, clearly mark them as NEW
+- Use the actual directory structure shown, not assumed paths
+- Keep the enriched prompt focused on what the user actually asked for"""
+
 
 class PromptEnricher:
     """Enriches user prompts using project context and LLM."""
 
-    def __init__(self, groq_client: GroqClient, project_context: ProjectContext):
+    def __init__(
+        self,
+        groq_client: GroqClient,
+        project_context: ProjectContext,
+        mode: str = "standard",
+    ):
         """
         Initialize the enricher.
 
         Args:
             groq_client: Initialized Groq API client
             project_context: Scanned project context
+            mode: Enrichment mode (standard, pseudocode)
         """
         self.client = groq_client
         self.context = project_context
-        self._system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            project_context=project_context.to_prompt_context()
-        )
+        self.mode = mode
+
+        if mode == "pseudocode":
+            self._system_prompt = PSEUDOCODE_SYSTEM_PROMPT_TEMPLATE.format(
+                project_context=project_context.to_prompt_context()
+            )
+            self._user_template = PSEUDOCODE_USER_TEMPLATE
+        else:
+            self._system_prompt = STANDARD_SYSTEM_PROMPT_TEMPLATE.format(
+                project_context=project_context.to_prompt_context()
+            )
+            self._user_template = STANDARD_USER_TEMPLATE
 
     async def enrich(
         self,
@@ -76,17 +105,9 @@ class PromptEnricher:
             if log_callback:
                 log_callback(msg)
 
-        log(f"Enriching prompt: '{user_prompt[:50]}...'")
+        log(f"Enriching prompt (mode: {self.mode}): '{user_prompt[:50]}...'")
 
-        user_message = f"""Transform this prompt into a detailed, accurate request:
-
-"{user_prompt}"
-
-Requirements:
-- Reference ONLY files and functions that appear in the project context
-- If you need to suggest creating new files, clearly mark them as NEW
-- Use the actual directory structure shown, not assumed paths
-- Keep the enriched prompt focused on what the user actually asked for"""
+        user_message = self._user_template.format(user_prompt=user_prompt)
 
         async for chunk in self.client.stream_completion(
             system_prompt=self._system_prompt,

@@ -4,17 +4,19 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Switch, Static
+from textual.widgets import Button, Input, Label, Switch, Static, Select
 
 from .config import (
     get_debounce_ms,
     get_model,
     get_realtime_mode,
     get_api_key,
+    get_enrichment_mode,
     set_debounce_ms,
     set_model,
     set_realtime_mode,
     set_api_key,
+    set_enrichment_mode,
 )
 
 
@@ -70,6 +72,7 @@ class SettingsScreen(Screen):
         current_realtime = get_realtime_mode()
         current_debounce = get_debounce_ms()
         current_api_key = get_api_key() or ""
+        current_mode = get_enrichment_mode()
 
         yield Container(
             Static("⚙️ Configuration Settings", classes="settings-title"),
@@ -86,6 +89,15 @@ class SettingsScreen(Screen):
                         password=True,
                         id="setting-api-key",
                         placeholder="gsk_...",
+                    ),
+                    classes="setting-item",
+                ),
+                Horizontal(
+                    Label("Enrichment Mode:", classes="setting-label"),
+                    Select(
+                        [("Standard", "standard"), ("Pseudocode", "pseudocode")],
+                        value=current_mode,
+                        id="setting-mode",
                     ),
                     classes="setting-item",
                 ),
@@ -117,6 +129,7 @@ class SettingsScreen(Screen):
         """Save the settings and close the screen."""
         model = self.query_one("#setting-model", Input).value.strip()
         api_key = self.query_one("#setting-api-key", Input).value.strip()
+        mode = self.query_one("#setting-mode", Select).value
         realtime = self.query_one("#setting-realtime", Switch).value
         debounce_str = self.query_one("#setting-debounce", Input).value.strip()
 
@@ -131,6 +144,8 @@ class SettingsScreen(Screen):
             set_model(model)
         if api_key:
             set_api_key(api_key)
+        if mode:
+            set_enrichment_mode(str(mode))
         set_realtime_mode(realtime)
         set_debounce_ms(debounce)
 

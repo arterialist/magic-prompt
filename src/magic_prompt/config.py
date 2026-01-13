@@ -10,6 +10,7 @@ from typing import Any
 DEFAULT_DEBOUNCE_MS = 800
 DEFAULT_REALTIME_MODE = False
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_ENRICHMENT_MODE = "standard"
 
 
 def get_config_dir() -> Path:
@@ -121,4 +122,17 @@ def set_api_key(api_key: str) -> None:
     """Set the Groq API key."""
     config = load_config()
     config["api_key"] = api_key
+    save_config(config)
+
+
+def get_enrichment_mode() -> str:
+    """Get the current enrichment mode."""
+    config = load_config()
+    return config.get("enrichment_mode", DEFAULT_ENRICHMENT_MODE)
+
+
+def set_enrichment_mode(mode: str) -> None:
+    """Set the current enrichment mode."""
+    config = load_config()
+    config["enrichment_mode"] = mode
     save_config(config)

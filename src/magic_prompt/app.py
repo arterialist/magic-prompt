@@ -21,6 +21,7 @@ from .config import (
     save_directory,
     set_realtime_mode,
     get_api_key,
+    get_enrichment_mode,
 )
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
@@ -350,7 +351,9 @@ class MainScreen(Screen):
             # Initialize Groq client with configured model
             try:
                 self.groq_client = GroqClient(api_key=self.api_key, model=get_model())
-                self.enricher = PromptEnricher(self.groq_client, self.project_context)
+                self.enricher = PromptEnricher(
+                    self.groq_client, self.project_context, mode=get_enrichment_mode()
+                )
                 mode_str = "⚡ Real-time" if self.realtime_mode else "Enter to submit"
                 self.add_log(f"[bold green]✓ Ready![/] ({mode_str})")
                 self.add_log(f"[dim]Model: {self.groq_client.model}[/]")
@@ -522,8 +525,11 @@ class MainScreen(Screen):
                 self.groq_client = GroqClient(
                     api_key=self.app.api_key or get_api_key(), model=get_model()
                 )
-                self.enricher = PromptEnricher(self.groq_client, self.project_context)
+                self.enricher = PromptEnricher(
+                    self.groq_client, self.project_context, mode=get_enrichment_mode()
+                )
                 self.add_log(f"[dim]Model: {self.groq_client.model}[/]")
+                self.add_log(f"[dim]Mode: {self.enricher.mode}[/]")
             except Exception as e:
                 self.add_log(f"[bold red]Error updating client:[/] {e}")
 
