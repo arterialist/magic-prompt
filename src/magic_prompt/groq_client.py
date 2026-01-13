@@ -127,3 +127,18 @@ class GroqClient:
             return bool(response.choices)
         except Exception:
             return False
+
+    def get_available_models(self) -> list[str]:
+        """
+        Fetch available models from Groq API.
+
+        Returns:
+            List of model IDs. Returns empty list on error.
+        """
+        try:
+            models = self._sync_client.models.list()
+            return [m.id for m in models.data]
+        except Exception as e:
+            # Fallback to default if API fails
+            print(f"Error fetching models: {e}")
+            return []
