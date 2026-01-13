@@ -109,3 +109,16 @@ def set_model(model: str) -> None:
     config = load_config()
     config["model"] = model
     save_config(config)
+
+
+def get_api_key() -> str | None:
+    """Get the Groq API key from config or environment."""
+    config = load_config()
+    return config.get("api_key") or os.getenv("GROQ_API_KEY")
+
+
+def set_api_key(api_key: str) -> None:
+    """Set the Groq API key."""
+    config = load_config()
+    config["api_key"] = api_key
+    save_config(config)

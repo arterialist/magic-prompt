@@ -20,10 +20,12 @@ from .config import (
     get_saved_directory,
     save_directory,
     set_realtime_mode,
+    get_api_key,
 )
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
 from .scanner import ProjectContext, scan_project
+from .settings import SettingsScreen
 
 
 class DirectoryScreen(Screen):
@@ -193,6 +195,7 @@ class MainScreen(Screen):
         Binding("ctrl+u", "clear_input", "Clear Input"),
         Binding("ctrl+l", "clear_output", "Clear Output", show=False),
         Binding("ctrl+r", "rescan", "Rescan"),
+        Binding("ctrl+s", "settings", "Settings"),
     ]
 
     # Reactive attribute for real-time mode
@@ -500,6 +503,29 @@ class MainScreen(Screen):
 
         if self.realtime_mode:
             self.add_log(f"[dim]Debounce: {self._debounce_ms}ms[/dim]")
+
+    def action_settings(self) -> None:
+        """Open the settings screen."""
+        self.app.push_screen(SettingsScreen(), callback=self.handle_settings_callback)
+
+    def handle_settings_callback(self, changed: bool) -> None:
+        """Handle settings screen being dismissed."""
+        if changed:
+            self.add_log("[bold green]✓ Settings updated[/]")
+            # Update local state from config
+            self._debounce_ms = get_debounce_ms()
+            self.realtime_mode = get_realtime_mode()
+            self._update_mode_indicator()
+
+            # Re-initialize groq client if needed (api key or model might have changed)
+            try:
+                self.groq_client = GroqClient(
+                    api_key=self.app.api_key or get_api_key(), model=get_model()
+                )
+                self.enricher = PromptEnricher(self.groq_client, self.project_context)
+                self.add_log(f"[dim]Model: {self.groq_client.model}[/]")
+            except Exception as e:
+                self.add_log(f"[bold red]Error updating client:[/] {e}")
 
 
 class MagicPromptApp(App):
