@@ -6,6 +6,8 @@
 
 A TUI and CLI tool that enriches short, vague prompts into detailed, structured prompts using Groq API and your project's actual file structure and codebase.
 
+<video src="demo.mp4" controls width="100%"></video>
+
 ## Features
 
 - 📁 **Project-Aware**: Scans your project's file structure, config files, and extracts code signatures
