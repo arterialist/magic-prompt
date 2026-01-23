@@ -15,6 +15,8 @@ from .config import (
     get_workspace,
     set_model,
     set_enrichment_mode,
+    get_max_files,
+    get_max_depth,
 )
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
@@ -35,11 +37,6 @@ def get_working_directory(label_or_path: str | None = None) -> str:
 
     # Load .env from current directory
     load_dotenv()
-
-    # Check for saved config (last used)
-    saved_dir = get_saved_directory()
-    if saved_dir:
-        return saved_dir
 
     # Check for MAGIC_PROMPT_DIR in env
     env_dir = os.getenv("MAGIC_PROMPT_DIR")
@@ -66,7 +63,11 @@ def get_prompt_from_input(args: argparse.Namespace) -> str | None:
 
 
 async def run_headless(
-    prompt: str, directory: str, quiet: bool = False, model: str | None = None
+    prompt: str,
+    directory: str,
+    quiet: bool = False,
+    model: str | None = None,
+    retrieval_mode: str | None = None,
 ) -> str:
     """Run enrichment in headless mode and return result."""
     if not quiet:
@@ -75,6 +76,8 @@ async def run_headless(
     # Scan project
     context = scan_project(
         directory,
+        max_depth=get_max_depth(),
+        max_files=get_max_files(),
         log_callback=None if quiet else lambda msg: print(f"   {msg}", file=sys.stderr),
     )
 
@@ -94,11 +97,20 @@ async def run_headless(
         sys.exit(1)
 
     # Initialize enricher
-    from .config import get_model
+    from .config import get_model, get_retrieval_mode, get_top_k_files
 
     model = model or get_model()
+    effective_retrieval = retrieval_mode or get_retrieval_mode()
     client = GroqClient(api_key=api_key, model=model)
-    enricher = PromptEnricher(client, context)
+    enricher = PromptEnricher(
+        client,
+        context,
+        retrieval_mode=effective_retrieval,
+        top_k=get_top_k_files(),
+    )
+
+    if not quiet:
+        print(f"🔍 Retrieval mode: {effective_retrieval}", file=sys.stderr)
 
     if not quiet:
         print(f"🔮 Enriching prompt (model: {model})...", file=sys.stderr)
@@ -206,6 +218,13 @@ Examples:
         "--model",
         metavar="MODEL",
         help="Set the Groq model to use (e.g., llama-3.3-70b-versatile)",
+    )
+
+    parser.add_argument(
+        "--retrieval",
+        choices=["tfidf", "heuristic", "none"],
+        metavar="MODE",
+        help="File retrieval mode: 'tfidf' (hybrid TF-IDF + heuristic), 'heuristic' (path/content matching), or 'none' (include all files)",
     )
 
     return parser
@@ -371,7 +390,15 @@ fi
     is_quiet = args.quiet or args.raycast
 
     try:
-        result = asyncio.run(run_headless(prompt, directory, quiet=is_quiet))
+        result = asyncio.run(
+            run_headless(
+                prompt,
+                directory,
+                quiet=is_quiet,
+                model=args.model,
+                retrieval_mode=args.retrieval,
+            )
+        )
 
         if is_quiet:
             print(result)

@@ -126,14 +126,16 @@ magic-prompt -q "add tests" > enriched.md
 
 #### CLI Options
 
-| Option            | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| `-d, --directory` | Project directory (default: from config or cwd) |
-| `-t, --tui`       | Launch interactive TUI mode                     |
-| `-q, --quiet`     | Only output result, no progress                 |
-| `--debounce MS`   | Set debounce time for real-time mode            |
-| `--save-dir DIR`  | Save default directory for future runs          |
-| `--show-config`   | Show current configuration                      |
+| Option            | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `-d, --directory` | Project directory (default: from config or cwd)     |
+| `-t, --tui`       | Launch interactive TUI mode                         |
+| `-q, --quiet`     | Only output result, no progress                     |
+| `--retrieval`     | File retrieval mode: `tfidf`, `heuristic`, `none`   |
+| `--model`         | Groq model to use (e.g., `llama-3.3-70b-versatile`) |
+| `--debounce MS`   | Set debounce time for real-time mode                |
+| `--save-dir DIR`  | Save default directory for future runs              |
+| `--show-config`   | Show current configuration                          |
 
 ### Interactive TUI Mode
 
@@ -157,7 +159,8 @@ magic-prompt
 | `Ctrl+Y` | Copy to clipboard        |
 | `Ctrl+U` | Clear Input              |
 | `Ctrl+L` | Clear Output             |
-| `Ctrl+R` | Rescan project           |
+| `Ctrl+R` | Cycle retrieval mode     |
+| `F5`     | Rescan project           |
 | `Ctrl+S` | Open Settings            |
 | `Ctrl+M` | Cycle enrichment mode    |
 | `Ctrl+W` | Manage workspaces        |
@@ -168,8 +171,80 @@ magic-prompt
 
 1. **Scans** your project directory structure
 2. **Extracts** docstrings, function signatures, and imports
-3. **Sends** context + your prompt to Groq's LLM
-4. **Streams** an enriched version that references actual files and APIs
+3. **Retrieves** the most relevant files based on your prompt (configurable)
+4. **Sends** context + your prompt to Groq's LLM
+5. **Streams** an enriched version that references actual files and APIs
+
+## Retrieval Modes
+
+Magic Prompt uses intelligent file retrieval to select the most relevant files from your project context before sending to the LLM. This is especially important for monorepos and large projects where including all files would exceed context limits.
+
+### Available Modes
+
+| Mode        | Description                                 | Best For                           |
+| ----------- | ------------------------------------------- | ---------------------------------- |
+| `tfidf`     | Hybrid TF-IDF + heuristic scoring (default) | Large projects, balanced accuracy  |
+| `heuristic` | Path and content-based structural matching  | Monorepos, explicit file targeting |
+| `none`      | Include all files without filtering         | Small projects (<50 files)         |
+
+### Setting Retrieval Mode
+
+**CLI (one-time):**
+
+```bash
+magic-prompt --retrieval heuristic "add user auth"
+```
+
+**Config (persistent):**
+
+```bash
+# In TUI: Press Ctrl+R to cycle through modes
+# Or edit ~/.config/magic-prompt/config.json:
+{
+  "retrieval_mode": "tfidf"
+}
+```
+
+### Working Principle
+
+**TF-IDF Mode (Hybrid):**
+
+- Computes TF-IDF vectors for all files based on path, docstrings, functions, and classes
+- Blends TF-IDF similarity (5%) with heuristic scoring (95%)
+- Produces relevance percentages shown in the LLM context (e.g., `[95% relevant]`)
+
+**Heuristic Mode:**
+
+- Matches query keywords against file paths, function names, and class names
+- Boosts exact path segment matches
+- Considers file recency (recently modified files rank higher)
+
+**None Mode:**
+
+- Includes all scanned files up to `max_files` limit
+- No filtering or ranking applied
+- Use only for small projects where context fits
+
+### Recommendations
+
+| Scenario                         | Recommended Mode | Reason                                   |
+| -------------------------------- | ---------------- | ---------------------------------------- |
+| Monorepo with multiple projects  | `heuristic`      | Best at isolating the correct subproject |
+| Large single project             | `tfidf`          | Balanced keyword + structural matching   |
+| Small project (<50 files)        | `none`           | Full context fits, no filtering needed   |
+| Targeting specific files by path | `heuristic`      | Highest weight on path segments          |
+| General feature requests         | `tfidf`          | Good at keyword relevance                |
+
+### Configuration Options
+
+```json
+{
+  "retrieval_mode": "tfidf", // "tfidf" | "heuristic" | "none"
+  "top_k_files": 20, // Max files to include in context
+  "max_files": 5000, // Max files to scan (increase for monorepos)
+  "max_depth": 8 // Directory traversal depth
+}
+```
 
 ## License
 

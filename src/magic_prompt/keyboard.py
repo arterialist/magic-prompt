@@ -9,9 +9,10 @@ DEFAULT_BINDINGS = [
     Binding("ctrl+y", "copy_output", "Copy"),
     Binding("ctrl+u", "clear_input", "Clear Input"),
     Binding("ctrl+l", "clear_output", "Clear Output", show=False),
-    Binding("ctrl+r", "rescan", "Rescan"),
+    Binding("ctrl+r", "cycle_retrieval_mode", "Retrieval"),
+    Binding("f5", "rescan", "Rescan"),
     Binding("ctrl+s", "settings", "Settings"),
     Binding("ctrl+m", "cycle_mode", "Cycle Mode"),
-    Binding("ctrl+b", "cycle_directory", "Cycle Workspace"),  # Changed from ctrl+d
+    Binding("ctrl+b", "cycle_directory", "Cycle Workspace"),
     Binding("ctrl+g", "workspace", "Workspaces"),
 ]

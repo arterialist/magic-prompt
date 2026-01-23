@@ -12,8 +12,11 @@ DEFAULT_REALTIME_MODE = False
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_ENRICHMENT_MODE = "standard"
 DEFAULT_COPY_TOAST = True
-DEFAULT_MAX_FILES = 1000
+DEFAULT_MAX_FILES = 5000
 DEFAULT_MAX_DEPTH = 10
+# Retrieval mode: "tfidf" (TF-IDF similarity), "heuristic" (keyword+recency only), "none" (include all)
+DEFAULT_RETRIEVAL_MODE = "tfidf"
+DEFAULT_TOP_K_FILES = 100
 DEFAULT_AVAILABLE_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
@@ -301,3 +304,32 @@ def update_available_models() -> list[str]:
         pass
 
     return get_available_models_from_config()
+
+
+def get_retrieval_mode() -> str:
+    """Get the retrieval mode (tfidf, heuristic, or none)."""
+    config = load_config()
+    return config.get("retrieval_mode", DEFAULT_RETRIEVAL_MODE)
+
+
+def set_retrieval_mode(mode: str) -> None:
+    """Set the retrieval mode (tfidf, heuristic, or none)."""
+    valid_modes = {"tfidf", "heuristic", "none"}
+    if mode not in valid_modes:
+        mode = DEFAULT_RETRIEVAL_MODE
+    config = load_config()
+    config["retrieval_mode"] = mode
+    save_config(config)
+
+
+def get_top_k_files() -> int:
+    """Get the number of top files to include after retrieval."""
+    config = load_config()
+    return config.get("top_k_files", DEFAULT_TOP_K_FILES)
+
+
+def set_top_k_files(k: int) -> None:
+    """Set the number of top files to include after retrieval."""
+    config = load_config()
+    config["top_k_files"] = max(5, min(100, k))
+    save_config(config)

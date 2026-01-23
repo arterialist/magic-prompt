@@ -58,11 +58,17 @@ class ProjectContext:
         if self.signatures:
             parts.append("\n## Source Files Analysis")
             parts.append(
-                "Below is detailed analysis of each source file including docstrings and APIs:\n"
+                "Files are listed with relevance scores based on query matching. Higher scores = more relevant:\n"
             )
 
             for sig in self.signatures:
-                parts.append(f"### `{sig.path}`")
+                # Get relevance score if available from retrieval
+                relevance = getattr(sig, "_debug_score", None)
+                if relevance is not None:
+                    relevance_pct = int(relevance * 100)
+                    parts.append(f"### `{sig.path}` [**{relevance_pct}% relevant**]")
+                else:
+                    parts.append(f"### `{sig.path}`")
 
                 if sig.docstring:
                     parts.append(f"**Purpose**: {sig.docstring}")
@@ -246,7 +252,7 @@ def extract_js_ts_signatures(file_path: Path) -> FileSignature:
 def scan_project(
     root_path: str,
     max_depth: int = 8,
-    max_files: int = 300,
+    max_files: int = 1000,
     log_callback: Callable[[str], None] | None = None,
 ) -> ProjectContext:
     """
@@ -258,6 +264,8 @@ def scan_project(
         max_files: Maximum number of files to process
         log_callback: Optional callback for logging progress
     """
+    if log_callback:
+        log_callback(f"DEBUG: scan_project called with max_files={max_files}")
     root = Path(root_path).resolve()
     if not root.exists() or not root.is_dir():
         raise ValueError(f"Invalid directory: {root_path}")

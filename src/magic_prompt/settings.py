@@ -25,6 +25,8 @@ from .config import (
     get_available_models_from_config,
     set_max_files,
     set_max_depth,
+    get_retrieval_mode,
+    set_retrieval_mode,
     save_workspace,
 )
 from .workspaces import WorkspaceModal
@@ -86,7 +88,9 @@ class SettingsScreen(Screen):
         current_mode = get_enrichment_mode()
         current_copy_toast = get_copy_toast()
         current_max_files = get_max_files()
+        current_max_files = get_max_files()
         current_max_depth = get_max_depth()
+        current_retrieval_mode = get_retrieval_mode()
 
         yield Container(
             Static("⚙️ Configuration Settings", classes="settings-title"),
@@ -143,6 +147,19 @@ class SettingsScreen(Screen):
                     classes="setting-item",
                 ),
                 Horizontal(
+                    Label("Retrieval Mode:", classes="setting-label"),
+                    Select(
+                        [
+                            ("TF-IDF", "tfidf"),
+                            ("Heuristic Only", "heuristic"),
+                            ("None (All Files)", "none"),
+                        ],
+                        value=current_retrieval_mode,
+                        id="setting-retrieval-mode",
+                    ),
+                    classes="setting-item",
+                ),
+                Horizontal(
                     Label("Max Files:", classes="setting-label"),
                     Input(
                         value=str(current_max_files),
@@ -180,7 +197,9 @@ class SettingsScreen(Screen):
         copy_toast = self.query_one("#setting-copy-toast", Switch).value
         debounce_str = self.query_one("#setting-debounce", Input).value.strip()
         max_files_str = self.query_one("#setting-max-files", Input).value.strip()
+        max_files_str = self.query_one("#setting-max-files", Input).value.strip()
         max_depth_str = self.query_one("#setting-max-depth", Input).value.strip()
+        retrieval_mode = self.query_one("#setting-retrieval-mode", Select).value
 
         try:
             debounce = int(debounce_str)
@@ -205,6 +224,10 @@ class SettingsScreen(Screen):
             set_api_key(api_key)
         if mode:
             set_enrichment_mode(str(mode))
+        if mode:
+            set_enrichment_mode(str(mode))
+        if retrieval_mode:
+            set_retrieval_mode(str(retrieval_mode))
         set_realtime_mode(realtime)
         set_copy_toast(copy_toast)
         set_debounce_ms(debounce)

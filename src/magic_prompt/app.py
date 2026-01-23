@@ -17,18 +17,20 @@ from .config import (
     get_debounce_ms,
     get_model,
     get_realtime_mode,
-    get_saved_directory,
     save_directory,
     set_realtime_mode,
     get_api_key,
     get_enrichment_mode,
     set_enrichment_mode,
+    set_retrieval_mode,
     get_copy_toast,
     get_next_directory,
     get_workspace,
     set_model,
     get_max_files,
     get_max_depth,
+    get_retrieval_mode,
+    get_top_k_files,
 )
 from .enricher import PromptEnricher
 from .groq_client import GroqClient
@@ -80,8 +82,8 @@ class DirectoryScreen(Screen):
     """
 
     def compose(self) -> ComposeResult:
-        # Pre-fill with saved directory if available
-        saved_dir = get_saved_directory() or ""
+        # Default to current directory
+        saved_dir = os.getcwd()
         yield Container(
             Static("🪄 Magic Prompt", id="dir-title"),
             Static("Enter the project root directory to analyze", id="dir-subtitle"),
@@ -203,12 +205,14 @@ class StatusBar(Static):
         mode = get_enrichment_mode()
         realtime = get_realtime_mode()
         model = get_model()
+        retrieval = get_retrieval_mode()
 
         realtime_str = "On" if realtime else "Off"
 
         status_text = (
             f"[bold cyan]Mode:[/] {mode.capitalize()}  |  "
             f"[bold yellow]Real-time:[/] {realtime_str}  |  "
+            f"[bold blue]Retrieval:[/] {retrieval}  |  "
             f"[bold green]Model:[/] {model}  |  "
             f"[bold magenta]Provider:[/] Groq"
         )
@@ -367,7 +371,8 @@ class MainScreen(Screen):
     @work(thread=True)
     def scan_project(self) -> None:
         """Scan the project directory in a background thread."""
-        self.add_log(f"[bold blue]Scanning project:[/] {self.project_path}")
+        current_path = self.project_path
+        self.add_log(f"[bold blue]Initiating scan for:[/] {current_path}")
 
         try:
             self.project_context = scan_project(
@@ -389,7 +394,11 @@ class MainScreen(Screen):
             try:
                 self.groq_client = GroqClient(api_key=self.api_key, model=get_model())
                 self.enricher = PromptEnricher(
-                    self.groq_client, self.project_context, mode=get_enrichment_mode()
+                    self.groq_client,
+                    self.project_context,
+                    mode=get_enrichment_mode(),
+                    retrieval_mode=get_retrieval_mode(),
+                    top_k=get_top_k_files(),
                 )
                 mode_str = "⚡ Real-time" if self.realtime_mode else "Enter to submit"
                 self.add_log(f"[bold green]✓ Ready![/] ({mode_str})")
@@ -577,10 +586,15 @@ class MainScreen(Screen):
                     api_key=self.app.api_key or get_api_key(), model=get_model()
                 )
                 self.enricher = PromptEnricher(
-                    self.groq_client, self.project_context, mode=get_enrichment_mode()
+                    self.groq_client,
+                    self.project_context,
+                    mode=get_enrichment_mode(),
+                    retrieval_mode=get_retrieval_mode(),
+                    top_k=get_top_k_files(),
                 )
                 self.add_log(f"[dim]Model: {self.groq_client.model}[/]")
                 self.add_log(f"[dim]Mode: {self.enricher.mode}[/]")
+                self.add_log(f"[dim]Retrieval: {self.enricher.retrieval_mode}[/]")
             except Exception as e:
                 self.add_log(f"[bold red]Error updating client:[/] {e}")
 
@@ -599,10 +613,39 @@ class MainScreen(Screen):
         # Update enricher
         if self.enricher:
             self.enricher = PromptEnricher(
-                self.groq_client, self.project_context, mode=next_mode
+                self.groq_client,
+                self.project_context,
+                mode=next_mode,
+                retrieval_mode=get_retrieval_mode(),
+                top_k=get_top_k_files(),
             )
 
         self.add_log(f"[bold cyan]Mode cycled to:[/] {next_mode.capitalize()}")
+        self._update_settings_bar()
+
+    def action_cycle_retrieval_mode(self) -> None:
+        """Cycle between retrieval modes."""
+        modes = ["tfidf", "heuristic", "none"]
+        current = get_retrieval_mode()
+        try:
+            next_index = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_index = 0
+
+        next_mode = modes[next_index]
+        set_retrieval_mode(next_mode)
+
+        # Update enricher
+        if self.enricher:
+            self.enricher = PromptEnricher(
+                self.groq_client,
+                self.project_context,
+                mode=get_enrichment_mode(),
+                retrieval_mode=next_mode,
+                top_k=get_top_k_files(),
+            )
+
+        self.add_log(f"[bold cyan]Retrieval mode cycled to:[/] {next_mode}")
         self._update_settings_bar()
 
     def action_cycle_directory(self) -> None:
@@ -661,16 +704,8 @@ class MainScreen(Screen):
         self.add_log(f"[bold cyan]Activated workspace:[/] {workspace_name}")
         self.app.sub_title = f"Working Directory: {self.project_path}"
 
-        # Re-initialize everything
-        try:
-            self.groq_client = GroqClient()
-            self.realtime_mode = get_realtime_mode()
-            self._debounce_ms = get_debounce_ms()
-            self._update_mode_indicator()
-            self._update_settings_bar()
-            self.scan_project()
-        except Exception as e:
-            self.add_log(f"[bold red]Activation Error:[/] {e}")
+        # Trigger scan which will re-initialize enricher and client
+        self.scan_project()
 
 
 class MagicPromptApp(App):
@@ -687,8 +722,10 @@ class MagicPromptApp(App):
 
     def __init__(self):
         super().__init__()
-        load_dotenv()
-        self.api_key = os.getenv("GROQ_API_KEY")
+        # Try loading .env from current directory or home
+        load_dotenv(Path(os.getcwd()) / ".env")
+        load_dotenv(Path.home() / ".env")
+        self.api_key = get_api_key()
         self.project_path: str | None = None
 
     def on_mount(self) -> None:
