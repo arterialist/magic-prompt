@@ -586,7 +586,7 @@ class MainScreen(Screen):
 
     def action_cycle_mode(self) -> None:
         """Cycle between enrichment modes."""
-        modes = ["standard", "pseudocode"]
+        modes = ["standard", "pseudocode", "elaboration"]
         current = get_enrichment_mode()
         try:
             next_index = (modes.index(current) + 1) % len(modes)

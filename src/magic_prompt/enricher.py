@@ -9,6 +9,10 @@ from .modes.pseudocode import (
     PSEUDOCODE_SYSTEM_PROMPT_TEMPLATE,
     PSEUDOCODE_USER_TEMPLATE,
 )
+from .modes.elaboration import (
+    ELABORATION_SYSTEM_PROMPT_TEMPLATE,
+    ELABORATION_USER_TEMPLATE,
+)
 
 
 STANDARD_SYSTEM_PROMPT_TEMPLATE = """You are a precise, technical prompt engineer. Your job is to transform short user prompts into detailed, accurate prompts that reference the ACTUAL codebase structure provided below.
@@ -79,6 +83,11 @@ class PromptEnricher:
                 project_context=project_context.to_prompt_context()
             )
             self._user_template = PSEUDOCODE_USER_TEMPLATE
+        elif mode == "elaboration":
+            self._system_prompt = ELABORATION_SYSTEM_PROMPT_TEMPLATE.format(
+                project_context=project_context.to_prompt_context()
+            )
+            self._user_template = ELABORATION_USER_TEMPLATE
         else:
             self._system_prompt = STANDARD_SYSTEM_PROMPT_TEMPLATE.format(
                 project_context=project_context.to_prompt_context()

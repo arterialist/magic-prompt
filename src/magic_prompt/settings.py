@@ -114,7 +114,11 @@ class SettingsScreen(Screen):
                 Horizontal(
                     Label("Enrichment Mode:", classes="setting-label"),
                     Select(
-                        [("Standard", "standard"), ("Pseudocode", "pseudocode")],
+                        [
+                            ("Standard", "standard"),
+                            ("Pseudocode", "pseudocode"),
+                            ("Elaboration", "elaboration"),
+                        ],
                         value=current_mode,
                         id="setting-mode",
                     ),
