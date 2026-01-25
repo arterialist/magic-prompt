@@ -38,6 +38,11 @@ def get_working_directory(label_or_path: str | None = None) -> str:
     # Load .env from current directory
     load_dotenv()
 
+    # Check for saved directory in config
+    saved_dir = get_saved_directory()
+    if saved_dir:
+        return saved_dir
+
     # Check for MAGIC_PROMPT_DIR in env
     env_dir = os.getenv("MAGIC_PROMPT_DIR")
     if env_dir:
