@@ -81,8 +81,29 @@ class WorkspaceModal(ModalScreen[Workspace | None]):
         title = "Edit Workspace" if self.workspace else "Add Workspace"
         name_val = self.workspace.name if self.workspace else ""
         path_val = self.workspace.path if self.workspace else ""
-        model_val = self.workspace.model if self.workspace else Select.BLANK
-        mode_val = self.workspace.mode if self.workspace else Select.BLANK
+
+        # Build selects without forcing a value for the "add" case.
+        # Newer Textual uses Select.NULL for blank; older used Select.BLANK.
+        # Avoid setting a sentinel explicitly to maintain compatibility.
+        model_select = Select(
+            [
+                ("Llama 3.3 70B", "llama-3.3-70b-versatile"),
+                ("Llama 3.1 8B", "llama-3.1-8b-instant"),
+                ("Mixtral 8x7B", "mixtral-8x7b-32768"),
+            ],
+            id="ws-model-select",
+            allow_blank=True,
+        )
+        if self.workspace and self.workspace.model:
+            model_select.value = self.workspace.model
+
+        mode_select = Select(
+            [("Standard", "standard"), ("Pseudocode", "pseudocode")],
+            id="ws-mode-select",
+            allow_blank=True,
+        )
+        if self.workspace and self.workspace.mode:
+            mode_select.value = self.workspace.mode
 
         yield Container(
             Static(f"✨ {title}", classes="modal-title"),
@@ -98,23 +119,9 @@ class WorkspaceModal(ModalScreen[Workspace | None]):
                     id="ws-path-input",
                 ),
                 Label("Model (Optional):"),
-                Select(
-                    [
-                        ("Llama 3.3 70B", "llama-3.3-70b-versatile"),
-                        ("Llama 3.1 8B", "llama-3.1-8b-instant"),
-                        ("Mixtral 8x7B", "mixtral-8x7b-32768"),
-                    ],
-                    value=model_val,
-                    id="ws-model-select",
-                    allow_blank=True,
-                ),
+                model_select,
                 Label("Mode (Optional):"),
-                Select(
-                    [("Standard", "standard"), ("Pseudocode", "pseudocode")],
-                    value=mode_val,
-                    id="ws-mode-select",
-                    allow_blank=True,
-                ),
+                mode_select,
                 classes="input-item",
             ),
             Horizontal(
@@ -129,8 +136,8 @@ class WorkspaceModal(ModalScreen[Workspace | None]):
     def handle_save(self) -> None:
         name = self.query_one("#ws-name-input", Input).value.strip()
         path = self.query_one("#ws-path-input", Input).value.strip()
-        model = self.query_one("#ws-model-select", Select).value
-        mode = self.query_one("#ws-mode-select", Select).value
+        model_select = self.query_one("#ws-model-select", Select)
+        mode_select = self.query_one("#ws-mode-select", Select)
 
         if not name or not path:
             return
@@ -140,8 +147,8 @@ class WorkspaceModal(ModalScreen[Workspace | None]):
         ws = Workspace(
             name=name,
             path=expanded_path,
-            model=str(model) if model and model != Select.BLANK else None,
-            mode=str(mode) if mode and mode != Select.BLANK else None,
+            model=(str(model_select.value) if not model_select.is_blank() else None),
+            mode=(str(mode_select.value) if not mode_select.is_blank() else None),
             realtime=self.workspace.realtime if self.workspace else None,
         )
         self.dismiss(ws)
